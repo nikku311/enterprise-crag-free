@@ -6,7 +6,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Literal
 
 load_dotenv()
@@ -18,6 +18,13 @@ class RiskAssessment(BaseModel):
     requires_human_review: bool = False
     nist_mapping: str = ""
     eu_ai_act: str = ""
+    
+    @field_validator('requires_human_review', mode='before')
+    @classmethod
+    def parse_bool(cls, v):
+        if isinstance(v, str):
+            return v.lower() in ('true', 'yes', '1')
+        return v
 
 def get_risk_guard():
     llm = ChatGroq(

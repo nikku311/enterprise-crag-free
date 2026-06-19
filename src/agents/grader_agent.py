@@ -6,15 +6,22 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Literal
 
 load_dotenv()
 
 class GradeResult(BaseModel):
     relevance: Literal["high", "medium", "low"] = "low"
-    score: float = 0.0
+    score: float = Field(default=0.0, ge=0.0, le=1.0)
     reasoning: str = ""
+    
+    @field_validator('score', mode='before')
+    @classmethod
+    def parse_score(cls, v):
+        if isinstance(v, str):
+            return float(v)
+        return v
 
 def get_grader():
     llm = ChatGroq(
@@ -27,11 +34,12 @@ def get_grader():
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", """Grade relevance of document to query.
-Score 0-1, classify as high(>0.7), medium(0.4-0.7), low(<0.4)"""),
+Return score as a NUMBER between 0 and 1.
+Classify as: high(>0.7), medium(0.4-0.7), low(<0.4)"""),
         ("human", """Query: {query}
 Document: {document}
 
-Grade relevance.""")
+Grade relevance. Return score as number.""")
     ])
     
     return prompt | structured_llm
