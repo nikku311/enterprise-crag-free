@@ -4,15 +4,25 @@ from langchain_qdrant import QdrantVectorStore
 from src.tools.embeddings import get_embeddings
 
 COLLECTION_NAME = "enterprise_docs"
+QDRANT_PATH = "./qdrant_storage"
+
+# SINGLE shared client instance
+_client = None
 
 def get_qdrant_client():
-    """Local file mode - no Docker needed"""
-    return QdrantClient(path="./qdrant_storage")
+    """Singleton client - ensures same instance is always used"""
+    global _client
+    if _client is None:
+        _client = QdrantClient(path=QDRANT_PATH)
+    return _client
 
 def create_collection():
     client = get_qdrant_client()
-    collections = client.get_collections().collections
-    exists = any(c.name == COLLECTION_NAME for c in collections)
+    try:
+        collections = client.get_collections().collections
+        exists = any(c.name == COLLECTION_NAME for c in collections)
+    except Exception:
+        exists = False
     
     if not exists:
         client.create_collection(
@@ -23,8 +33,11 @@ def create_collection():
     return client
 
 def get_vector_store():
+    create_collection()
+    
     embeddings = get_embeddings()
     client = get_qdrant_client()
+    
     return QdrantVectorStore(
         client=client,
         collection_name=COLLECTION_NAME,
